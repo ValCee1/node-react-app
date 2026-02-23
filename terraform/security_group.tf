@@ -1,10 +1,10 @@
 # Create a security group for the EC2 instance
 resource "aws_security_group" "my-app" {
   vpc_id      = aws_vpc.my-app.id
-  name        = "${var.env}-${var.app-name}"
+  name        = "${var.env}-${var.app_name}"
   description = "Allow PING and SSH access and open port 3000"
   tags = {
-    Name = "${var.env}-${var.app-name}"
+    Name = "${var.env}-${var.app_name}"
   }
   egress {
     from_port   = -0

@@ -6,9 +6,14 @@ resource "aws_instance" "app-server" {
   instance_type        = var.instance_type
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
   key_name             = aws_key_pair.my-app.key_name
-  user_data            = file("entry-script.sh")
+
+  user_data = templatefile("scripts/init.sh", {
+    env    = var.env
+    bucket = aws_s3_bucket.backup.bucket
+  })
+
   tags = {
-    Name = "${var.env}-${var.app-name}-server"
+    Name = "${var.env}-${var.app_name}-server"
   }
   depends_on = [aws_iam_instance_profile.ec2_profile, aws_subnet.my-app, aws_key_pair.my-app]
 }

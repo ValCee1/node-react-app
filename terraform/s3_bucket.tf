@@ -1,10 +1,10 @@
 # Create an S3 bucket for backups
 resource "aws_s3_bucket" "backup" {
-  bucket        = "${var.env}-${var.app-name}-backup-bucket"
+  bucket        = "${var.env}-${var.app_name}-backup-bucket"
   force_destroy = true
 
   tags = {
-    Name        = "${var.env}-${var.app-name}-backup-bucket"
+    Name        = "${var.env}-${var.app_name}-backup-bucket"
     Environment = var.env
   }
 }

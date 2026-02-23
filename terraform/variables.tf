@@ -1,7 +1,7 @@
 variable "AWS_REGION" {
 }
 
-variable "app-name" {
+variable "app_name" {
   type    = string
   default = "node-react"
 }

@@ -2,14 +2,14 @@ resource "aws_vpc" "my-app" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   tags = {
-    Name = "${var.env}-${var.app-name}"
+    Name = "${var.env}-${var.app_name}"
   }
 }
 
 resource "aws_internet_gateway" "my-app" {
   vpc_id = aws_vpc.my-app.id
   tags = {
-    Name = "${var.env}-${var.app-name}"
+    Name = "${var.env}-${var.app_name}"
   }
   depends_on = [aws_vpc.my-app]
 }
@@ -25,11 +25,12 @@ resource "aws_route_table" "my-app" {
 }
 
 resource "aws_subnet" "my-app" {
-  vpc_id            = aws_vpc.my-app.id
-  cidr_block        = var.subnet_cidr[0]
-  availability_zone = var.availability_zone
+  vpc_id                  = aws_vpc.my-app.id
+  cidr_block              = var.subnet_cidr[0]
+  availability_zone       = var.availability_zone
+  map_public_ip_on_launch = true
   tags = {
-    Name = "${var.env}-${var.app-name}"
+    Name = "${var.env}-${var.app_name}"
   }
   depends_on = [aws_route_table.my-app]
 }
@@ -45,6 +46,6 @@ resource "aws_key_pair" "my-app" {
   public_key = file(var.PATH_TO_PUBLIC_KEY)
   key_name   = "Macbook"
   tags = {
-    Name = "${var.env}-${var.app-name}-key"
+    Name = "${var.env}-${var.app_name}-key"
   }
 }
