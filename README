@@ -119,3 +119,16 @@ A learning platform for DevOps engineering
 A reproducible startup deployment template
 
 A portfolio-ready infrastructure project
+
+
+Push to main
+   ↓
+GitLab CI builds image
+   ↓
+Push to ECR
+   ↓
+GitLab triggers deploy step
+   ↓
+EC2 pulls new image
+   ↓
+Container restarts

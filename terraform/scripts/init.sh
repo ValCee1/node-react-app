@@ -63,6 +63,7 @@ chmod +x "$BACKUP_SCRIPT_PATH"
 chown ubuntu:ubuntu "$BACKUP_SCRIPT_PATH"
 
 # Log rotation
+echo "Setting up log rotation for Mongo backup logs..."
 cat << 'EOF' > /etc/logrotate.d/mongo-backup
 /var/log/mongo-backup.log 
   weekly
@@ -74,6 +75,7 @@ cat << 'EOF' > /etc/logrotate.d/mongo-backup
 EOF
 
 # Set up cron job for backup script
+echo "Setting up cron job for Mongo backup..."
 echo "0 2 * * * ubuntu $BACKUP_SCRIPT_PATH >> /var/log/mongo-backup.log 2>&1" > "$CRON_FILE"
 chmod 644 "$CRON_FILE"
 
