@@ -1,0 +1,11 @@
+*auto.tfvars
+makefile
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.log
+*.backup
+*.bak
+*.tmp
+*.swp  
