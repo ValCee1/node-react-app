@@ -3,6 +3,7 @@ availability_zone  = "eu-west-3a"
 ami                = "ami-04df1508c6be5879e"
 app_name           = "node-react-app"
 env                = "dev"
+GITHUB_REPO        = "ValCee1/node-react-app"
 vpc_cidr           = "10.0.0.0/16"
 subnet_cidr        = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
 SSH_IPS            = ["196.251.243.24/29"]

@@ -1,6 +1,7 @@
 dev:
 	npm run dev
 
+
 install:
 	npm install
 	cd client && npm install

@@ -71,13 +71,13 @@ resource "aws_iam_role" "ec2_role" {
 }
 
 
-# Attach Both S3 and ECR Policies to EC2 Role
-
+# Attach Both S3 Policy to EC2 Role
 resource "aws_iam_role_policy_attachment" "attach_s3" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.s3_backup_policy.arn
 }
 
+# Attach ECR Policy to EC2 Role
 resource "aws_iam_role_policy_attachment" "attach_ecr" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.ecr_pull_policy.arn
@@ -88,4 +88,3 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.env}-ec2-profile"
   role = aws_iam_role.ec2_role.name
 }
-

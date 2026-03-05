@@ -19,6 +19,9 @@ variable "ami" {
 variable "env" {
   type = string
 }
+variable "GITHUB_REPO" {
+  type = string
+}
 variable "instance_type" {
   type = string
 }
