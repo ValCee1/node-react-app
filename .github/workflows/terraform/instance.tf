@@ -1,5 +1,5 @@
 # Create an EC2 instance for the server
-resource "aws_instance" "app-server" {
+resource "aws_instance" "app_server" {
   security_groups      = [aws_security_group.my-app.id]
   subnet_id            = aws_subnet.my-app.id
   ami                  = var.ami

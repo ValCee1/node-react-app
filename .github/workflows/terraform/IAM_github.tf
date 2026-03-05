@@ -1,6 +1,6 @@
 
 # This role is for github actions to gain access via iam
-resource "aws_iam_role" "github_actions_role" {
+resource "aws_iam_role" "github_actions" {
   name = "github-actions-ecr-role"
 
   assume_role_policy = jsonencode({
@@ -62,7 +62,7 @@ resource "aws_iam_policy" "github_ecr_push" {
           "ecr:CompleteLayerUpload"
         ]
 
-        Resource = aws_ecr_repository.app_repo.arn
+        Resource = aws_ecr_repository.app.arn
       }
     ]
   })
@@ -71,7 +71,7 @@ resource "aws_iam_policy" "github_ecr_push" {
 # Attach Policy to Role
 resource "aws_iam_role_policy_attachment" "github_ecr_attach" {
 
-  role       = aws_iam_role.github_actions_role.name
+  role       = aws_iam_role.github_actions.name
   policy_arn = aws_iam_policy.github_ecr_push.arn
 
 }
