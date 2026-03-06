@@ -22,6 +22,13 @@ variable "env" {
 variable "GITHUB_REPO" {
   type = string
 }
+variable "github_user" {
+  type = string
+}
+variable "github_token" {
+  type      = string
+  sensitive = true
+}
 variable "instance_type" {
   type = string
 }
