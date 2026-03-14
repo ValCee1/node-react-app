@@ -6,68 +6,90 @@ on:
       - main
 
 env:
-  AWS_REGION: ${{ env.AWS_REGION }}
-  ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
-  IMAGE_TAG: ${{ github.sha }}[1:7]
+  # Non-sensitive values pulled from GitHub Actions Variables
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
-  # Secrets
-  AWS_ROLE: ${{ secrets.AWS_ROLE_ARN }}
+  # Sensitive registry URL pulled from GitHub Actions Secrets
   ECR_REGISTRY: ${{ secrets.ECR_REPOSITORY_URL }}
-  EC2_HOST: ${{ secrets.EC2_HOST }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Expose image_tag so the deploy job can reference the exact image that was built
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      # Slice the full SHA to 7 chars to match standard short SHA convention
+      # Written to GITHUB_OUTPUT so it can be passed to the deploy job via outputs
+      - name: Set image tag
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # Authenticate to AWS using OIDC - no static credentials needed
+      # role-to-assume uses a short-lived token instead of AWS_ACCESS_KEY_ID/SECRET
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ env.AWS_ROLE }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
+      # Handles ECR authentication automatically using the AWS credentials above
       - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region $AWS_REGION \
-          | docker login --username AWS --password-stdin $ECR_REGISTRY
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Image
-        run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+      # Builds, tags, and pushes in a single step
+      # Tags with both the short SHA (immutable) and latest (convenience pointer)
+      # cache-from pulls the latest image to reuse unchanged layers, speeding up builds
+      # cache-to inline embeds cache metadata into the image itself
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-to: type=inline
 
-      - name: Tag Image
-        run: |
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG \
-          $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-      - name: Push Image
-        run: |
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
+    # Only runs after build completes successfully
   deploy:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
+      # Uses appleboy/ssh-action to avoid writing the SSH key to disk on the runner
+      # The key is passed securely in memory, never touches the filesystem
       - name: Deploy to EC2
-        run: |
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Authenticate Docker to ECR from within the EC2 instance
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} \
+              | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
 
-          echo "${{ secrets.EC2_SSH_KEY }}" > key.pem
-          chmod 600 key.pem
+            # Pull the exact image that was built in the build job using the shared tag
+            docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image_tag }}
 
-          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$EC2_HOST "
+            # Stop and remove the existing container if running, ignore errors if not
+            docker stop app || true && docker rm app || true
 
-          aws ecr get-login-password --region $AWS_REGION \
-          | docker login --username AWS --password-stdin $ECR_REGISTRY &&
+            # Run the new container
+            # --restart unless-stopped ensures it survives EC2 reboots
+            # -p 80:3000 maps host port 80 to container port 3000
+            docker run -d \
+              --name app \
+              --restart unless-stopped \
+              -p 80:3000 \
+              ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image_tag }}
 
-          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG &&
-
-          docker stop app || true &&
-          docker rm app || true &&
-
-          docker run -d --name app -p 80:3000 \
-          $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          "
+            # Remove dangling images left over from previous deploys to free disk space
+            docker image prune -f
