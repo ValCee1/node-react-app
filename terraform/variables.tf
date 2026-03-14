@@ -36,6 +36,9 @@ variable "OPEN_PORTS" {
   type = list(string)
 }
 
+variable "PATH_TO_PRIVATE_KEY" {
+  type = string
+}
 variable "PATH_TO_PUBLIC_KEY" {
   type = string
 }
@@ -54,4 +57,10 @@ variable "SSH_PORT" {
 
 variable "vpc_cidr" {
   type = string
+}
+
+
+variable "create_instance" {
+  type    = bool
+  default = false
 }

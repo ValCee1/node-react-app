@@ -6,44 +6,46 @@ on:
       - main
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: my-app
-  IMAGE_TAG: ${{ github.sha }}
+  AWS_REGION: ${{ env.AWS_REGION }}
+  ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+  IMAGE_TAG: ${{ github.sha }}[1:7]
+
+  # Secrets
+  AWS_ROLE: ${{ secrets.AWS_ROLE_ARN }}
+  ECR_REGISTRY: ${{ secrets.ECR_REPOSITORY_URL }}
+  EC2_HOST: ${{ secrets.EC2_HOST }}
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE }}
+          role-to-assume: ${{ env.AWS_ROLE }}
 
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION \
-          | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-      - name: Build Docker Image
+      - name: Build Image
         run: |
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-      - name: Tag Docker Image
+      - name: Tag Image
         run: |
           docker tag $ECR_REPOSITORY:$IMAGE_TAG \
-          ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
+          $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Push Image
         run: |
-          docker push \
-          ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
-
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   deploy:
     needs: build
@@ -52,19 +54,20 @@ jobs:
     steps:
       - name: Deploy to EC2
         run: |
+
           echo "${{ secrets.EC2_SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
-          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_HOST }} "
+          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$EC2_HOST "
 
           aws ecr get-login-password --region $AWS_REGION \
-          | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }} &&
+          | docker login --username AWS --password-stdin $ECR_REGISTRY &&
 
-          docker pull ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG &&
+          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG &&
 
           docker stop app || true &&
           docker rm app || true &&
 
           docker run -d --name app -p 80:3000 \
-          ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
+          $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           "

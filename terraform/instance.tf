@@ -1,11 +1,12 @@
 # Create an EC2 instance for the server
 resource "aws_instance" "app_server" {
-  security_groups      = [aws_security_group.my-app.id]
-  subnet_id            = aws_subnet.my-app.id
-  ami                  = var.ami
-  instance_type        = var.instance_type
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-  key_name             = aws_key_pair.my-app.key_name
+  security_groups             = [aws_security_group.my-app.id]
+  subnet_id                   = aws_subnet.my-app.id
+  ami                         = var.ami
+  instance_type               = var.instance_type
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
+  key_name                    = aws_key_pair.my-app.key_name
+  user_data_replace_on_change = false
 
   user_data = templatefile("scripts/init.sh", {
     env    = var.env
