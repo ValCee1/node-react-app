@@ -1,0 +1,53 @@
+services:
+  mongodb:
+    image: mongo
+    restart: unless-stopped
+    expose:
+      - "27017"
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+
+  mongo-express:
+    image: mongo-express
+    restart: unless-stopped
+    # Uncomment when you need DB access, recomment and redeploy when done
+    ports:
+      - "8081:8081"
+    expose:
+      - "8081"
+    depends_on:
+      - mongodb
+    env_file:
+      - .env
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_OPTIONS_EDITORTHEME: "ambiance"
+
+  backend:
+    image: ${ECR_REPO_URL}/${ECR_REPOSITORY}/backend:${IMAGE_TAG}
+    restart: unless-stopped
+    expose:
+      - "5000"
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+
+  frontend:
+    image: ${ECR_REPO_URL}/${ECR_REPOSITORY}/frontend:${IMAGE_TAG}
+    restart: unless-stopped
+    # nginx inside the container handles routing - only port 80 exposed to host
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:

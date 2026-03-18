@@ -22,17 +22,14 @@ resource "github_actions_secret" "EC2_SSH_KEY" {
   plaintext_value = file(var.PATH_TO_PRIVATE_KEY)
 }
 
-resource "github_actions_variable" "aws_region" {
-  value         = var.AWS_REGION
-  repository    = var.app_name
-  variable_name = "AWS_REGION"
-
+resource "github_actions_secret" "MONGO_USERNAME" {
+  repository      = var.app_name
+  secret_name     = "MONGO_USERNAME"
+  plaintext_value = var.MONGO_USERNAME
 }
 
-resource "github_actions_variable" "ecr_repository" {
-  value         = var.app_name
-  repository    = var.app_name
-  variable_name = "ECR_REPOSITORY"
-
+resource "github_actions_secret" "MONGO_PASSWORD" {
+  repository      = var.app_name
+  secret_name     = "MONGO_PASSWORD"
+  plaintext_value = var.MONGO_PASSWORD
 }
-

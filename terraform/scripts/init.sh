@@ -14,6 +14,10 @@ echo "===== EC2 Initialization Started at $(date) ====="
 apt update -y
 apt install -y docker.io cron unzip curl
 
+# Confirm docker commands are available before proceeding
+timeout 30 bash -c 'until command -v docker > /dev/null 2>&1; do sleep 1; done'
+docker pull node:20-alpine
+
 # Install AWS CLI v2
 curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -q awscliv2.zip

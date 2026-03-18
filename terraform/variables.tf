@@ -32,6 +32,15 @@ variable "github_token" {
 variable "instance_type" {
   type = string
 }
+variable "MONGO_USERNAME" {
+  type = string
+}
+variable "MONGO_PASSWORD" {
+  type = string
+}
+variable "MONGO_URI" {
+  type = string
+}
 variable "OPEN_PORTS" {
   type = list(string)
 }
@@ -59,8 +68,3 @@ variable "vpc_cidr" {
   type = string
 }
 
-
-variable "create_instance" {
-  type    = bool
-  default = false
-}

@@ -5,22 +5,25 @@ on:
     branches:
       - main
 
+# Required for OIDC authentication with AWS
 permissions:
   id-token: write
   contents: read
 
 env:
-  # Non-sensitive values pulled from GitHub Actions Variables
+  # Non-sensitive values (GitHub Variables)
   AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
-  # Sensitive registry URL pulled from GitHub Actions Secrets
-  ECR_REGISTRY: ${{ secrets.ECR_REPOSITORY_URL }}
+  # Sensitive values (GitHub Secrets)
+  ECR_REPO_URL: ${{ secrets.ECR_REPOSITORY_URL }}
+
+  # Constructed from secrets using expression syntax, not shell interpolation
+  MONGO_URI: mongodb://${{ secrets.MONGO_USERNAME }}:${{ secrets.MONGO_PASSWORD }}@mongodb:27017/node-react-starter?authSource=admin
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Expose image_tag so the deploy job can reference the exact image that was built
     outputs:
       image_tag: ${{ steps.meta.outputs.tag }}
 
@@ -28,72 +31,92 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Slice the full SHA to 7 chars to match standard short SHA convention
-      # Written to GITHUB_OUTPUT so it can be passed to the deploy job via outputs
+      # Slice full SHA to 7 chars for a concise, standard short SHA tag
       - name: Set image tag
         id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      # Authenticate to AWS using OIDC - no static credentials needed
-      # role-to-assume uses a short-lived token instead of AWS_ACCESS_KEY_ID/SECRET
+      # OIDC-based auth - no static AWS keys needed
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
-      # Handles ECR authentication automatically using the AWS credentials above
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Builds, tags, and pushes in a single step
-      # Tags with both the short SHA (immutable) and latest (convenience pointer)
-      # cache-from pulls the latest image to reuse unchanged layers, speeding up builds
-      # cache-to inline embeds cache metadata into the image itself
-      - name: Build and push image
+      # Cache scoped to the backend image specifically
+      - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./app/Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
-          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+            ${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/backend:${{ steps.meta.outputs.tag }}
+            ${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/backend:latest
+          cache-from: type=registry,ref=${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/backend:latest
           cache-to: type=inline
 
-    # Only runs after build completes successfully
+      # Cache scoped to the frontend image specifically
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./app/client/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/frontend:${{ steps.meta.outputs.tag }}
+            ${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/frontend:latest
+          cache-from: type=registry,ref=${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/frontend:latest
+          cache-to: type=inline
+
   deploy:
+    # Only runs after build job completes successfully
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      # Uses appleboy/ssh-action to avoid writing the SSH key to disk on the runner
-      # The key is passed securely in memory, never touches the filesystem
-      - name: Deploy to EC2
+      - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Authenticate Docker to ECR from within the EC2 instance
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} \
-              | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+            # Navigate to app directory (repo must be pre-cloned on EC2)
+            cd ~/node-react-app
 
-            # Pull the exact image that was built in the build job using the shared tag
-            docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image_tag }}
+            # Write only the vars the app actually consumes
+            # GitHub expressions are interpolated before the script is sent over SSH
+            cat <<'EOF' > .env
+            MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_USERNAME }}
+            MONGO_INITDB_ROOT_PASSWORD=${{ secrets.MONGO_PASSWORD }}
+            MONGODB_URI=mongodb://${{ secrets.MONGO_USERNAME }}:${{ secrets.MONGO_PASSWORD }}@mongodb:27017/react-node-app?authSource=admin
+            NODE_ENV=production
+            PUBLIC_URL=${{ secrets.EC2_HOST }}
+            EOF
 
-            # Stop and remove the existing container if running, ignore errors if not
-            docker stop app || true && docker rm app || true
+            # Restrict .env permissions - readable by owner only
+            chmod 600 .env
 
-            # Run the new container
-            # --restart unless-stopped ensures it survives EC2 reboots
-            # -p 80:3000 maps host port 80 to container port 3000
-            docker run -d \
-              --name app \
-              --restart unless-stopped \
-              -p 80:3000 \
-              ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image_tag }}
+            # Write compose-specific vars to a separate file
+            # Keeps deployment config out of the app's runtime environment
+            cat <<'EOF' > .env.deploy
+            ECR_REPO_URL=${{ secrets.ECR_REPOSITORY_URL }}
+            ECR_REPOSITORY=${{ vars.ECR_REPOSITORY }}
+            IMAGE_TAG=${{ needs.build.outputs.image_tag }}
+            EOF
 
-            # Remove dangling images left over from previous deploys to free disk space
+            # Authenticate Docker daemon to ECR
+            aws ecr get-login-password --region ${{ vars.AWS_REGION }} \
+              | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_URL }}
+
+            # Pull updated images and restart all services
+            docker compose --env-file .env --env-file .env.deploy down || true
+            docker compose --env-file .env --env-file .env.deploy pull
+            docker compose --env-file .env --env-file .env.deploy up -d
+
+            # Remove dangling images to prevent disk exhaustion
             docker image prune -f
