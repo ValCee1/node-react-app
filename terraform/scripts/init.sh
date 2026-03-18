@@ -34,6 +34,7 @@ timeout 30 bash -c 'until docker info > /dev/null 2>&1; do sleep 1; done'
 curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
   -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
+apt-get install -y docker-compose-plugin
 
 echo "Dependencies installed"
 
