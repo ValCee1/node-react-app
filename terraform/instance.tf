@@ -16,5 +16,14 @@ resource "aws_instance" "app_server" {
   tags = {
     Name = "${var.env}-${var.app_name}-server"
   }
+  lifecycle {
+    ignore_changes = [
+      user_data,       # ignore user_data drift
+      ami,             # ignore AMI updates (e.g. if you update AMIs externally)
+      tags,            # ignore tag changes made outside Terraform
+      security_groups, # legacy EC2-Classic attribute, ignore it
+      # vpc_security_group_ids,
+    ]
+  }
   depends_on = [aws_iam_instance_profile.ec2_profile, aws_subnet.my-app, aws_key_pair.my-app]
 }

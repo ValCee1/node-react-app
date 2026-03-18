@@ -31,37 +31,34 @@ resource "aws_iam_role" "github_actions" {
 
 # Aws IAM policy for github ecr push
 resource "aws_iam_policy" "github_ecr_push" {
-
   name = "github-ecr-push"
 
   policy = jsonencode({
     Version = "2012-10-17"
-
     Statement = [
-
       {
+        Sid    = "ECRAuth"
         Effect = "Allow"
-
         Action = [
           "ecr:GetAuthorizationToken"
         ]
-
         Resource = "*"
       },
-
       {
+        Sid    = "ECRPushPull"
         Effect = "Allow"
-
         Action = [
+          # Pull / cache
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage",
+          "ecr:DescribeImages", # needed to check cache manifest exists
+          # Push
           "ecr:PutImage",
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
           "ecr:CompleteLayerUpload"
         ]
-
         Resource = aws_ecr_repository.app.arn
       }
     ]

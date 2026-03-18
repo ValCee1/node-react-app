@@ -12,23 +12,26 @@ resource "aws_security_group" "my-app" {
     protocol    = "-1"
     cidr_blocks = [var.ALL_IP]
   }
-  ingress {
-    from_port   = var.SSH_PORT
-    to_port     = var.SSH_PORT
-    protocol    = "tcp"
-    cidr_blocks = var.SSH_IPS
-    description = "Allow SSH Access"
-  }
-  ingress {
-    from_port   = "8"
-    to_port     = "0"
-    protocol    = "icmp"
-    cidr_blocks = var.SSH_IPS
-    description = "Allow PING Requests"
-  }
   depends_on = [aws_vpc.my-app]
 }
 
+resource "aws_security_group_rule" "ssh" {
+  type              = "ingress"
+  to_port           = 22
+  from_port         = 22
+  protocol          = "tcp"
+  cidr_blocks       = var.SSH_IPS
+  security_group_id = aws_security_group.my-app.id
+}
+
+resource "aws_security_group_rule" "ping" {
+  type              = "ingress"
+  to_port           = 0
+  from_port         = 8
+  protocol          = "icmp"
+  cidr_blocks       = var.SSH_IPS
+  security_group_id = aws_security_group.my-app.id
+}
 # Dynamically create security group rules for each port in the OPEN_PORTS variable
 resource "aws_security_group_rule" "my-app" {
   for_each = toset(var.OPEN_PORTS)
