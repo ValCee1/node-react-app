@@ -31,7 +31,8 @@ services:
       ME_CONFIG_OPTIONS_EDITORTHEME: "ambiance"
 
   backend:
-    image: ${ECR_REPO_URL}/${ECR_REPOSITORY}/backend:${IMAGE_TAG}
+    # Each service now references its own dedicated ECR repository URL
+    image: ${BACKEND_ECR_REPO_URL}:${IMAGE_TAG}
     restart: unless-stopped
     expose:
       - "5000"
@@ -41,13 +42,13 @@ services:
       - mongodb
 
   frontend:
-    image: ${ECR_REPO_URL}/${ECR_REPOSITORY}/frontend:${IMAGE_TAG}
+    image: ${FRONTEND_ECR_REPO_URL}:${IMAGE_TAG}
     restart: unless-stopped
-    # nginx inside the container handles routing - only port 80 exposed to host
     ports:
       - "80:80"
+    env_file:
+      - .env
     depends_on:
       - backend
-
 volumes:
   mongo_data:

@@ -30,6 +30,8 @@ resource "aws_iam_role" "github_actions" {
 }
 
 # Aws IAM policy for github ecr push
+
+# IAM policy scoped to both repositories
 resource "aws_iam_policy" "github_ecr_push" {
   name = "github-ecr-push"
 
@@ -37,29 +39,29 @@ resource "aws_iam_policy" "github_ecr_push" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "ECRAuth"
-        Effect = "Allow"
-        Action = [
-          "ecr:GetAuthorizationToken"
-        ]
+        Sid      = "ECRAuth"
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
         Resource = "*"
       },
       {
         Sid    = "ECRPushPull"
         Effect = "Allow"
         Action = [
-          # Pull / cache
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage",
-          "ecr:DescribeImages", # needed to check cache manifest exists
-          # Push
+          "ecr:DescribeImages",
           "ecr:PutImage",
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
           "ecr:CompleteLayerUpload"
         ]
-        Resource = aws_ecr_repository.app.arn
+        # Scoped to both repositories
+        Resource = [
+          aws_ecr_repository.backend.arn,
+          aws_ecr_repository.frontend.arn
+        ]
       }
     ]
   })

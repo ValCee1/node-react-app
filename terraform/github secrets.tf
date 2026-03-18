@@ -4,10 +4,16 @@ resource "github_actions_secret" "aws_role" {
   plaintext_value = aws_iam_role.github_actions.arn
 }
 
-resource "github_actions_secret" "ecr_repo_url" {
+resource "github_actions_secret" "frontend_repo_url" {
   repository      = var.app_name
-  secret_name     = "ECR_REPOSITORY_URL"
-  plaintext_value = aws_ecr_repository.app.repository_url
+  secret_name     = "FRONTEND_ECR_REPOSITORY_URL"
+  plaintext_value = aws_ecr_repository.frontend.repository_url
+}
+
+resource "github_actions_secret" "backend_repo_url" {
+  repository      = var.app_name
+  secret_name     = "BACKEND_ECR_REPOSITORY_URL"
+  plaintext_value = aws_ecr_repository.backend.repository_url
 }
 
 resource "github_actions_secret" "ec2_public_ip" {

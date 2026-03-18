@@ -13,13 +13,11 @@ permissions:
 env:
   # Non-sensitive values (GitHub Variables)
   AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
   # Sensitive values (GitHub Secrets)
-  ECR_REPO_URL: ${{ secrets.ECR_REPOSITORY_URL }}
-
-  # Constructed from secrets using expression syntax, not shell interpolation
-  MONGO_URI: mongodb://${{ secrets.MONGO_USERNAME }}:${{ secrets.MONGO_PASSWORD }}@mongodb:27017/node-react-starter?authSource=admin
+  # These are full repository URLs from Terraform output - no extra path needed
+  BACKEND_ECR_REPO_URL: ${{ secrets.BACKEND_ECR_REPOSITORY_URL }}
+  FRONTEND_ECR_REPO_URL: ${{ secrets.FRONTEND_ECR_REPOSITORY_URL }}
 
 jobs:
   build:
@@ -46,30 +44,32 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Cache scoped to the backend image specifically
+      # Context scoped to ./app so package.json is found at the root of the build context
       - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
           context: ./app
           file: ./app/Dockerfile
           push: true
+          # BACKEND_ECR_REPO_URL is already the full image path - no suffix needed
           tags: |
-            ${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/backend:${{ steps.meta.outputs.tag }}
-            ${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/backend:latest
-          cache-from: type=registry,ref=${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/backend:latest
+            ${{ env.BACKEND_ECR_REPO_URL }}:${{ steps.meta.outputs.tag }}
+            ${{ env.BACKEND_ECR_REPO_URL }}:latest
+          cache-from: type=registry,ref=${{ env.BACKEND_ECR_REPO_URL }}:latest
           cache-to: type=inline
 
-      # Cache scoped to the frontend image specifically
+      # Context scoped to ./app/client so frontend build files are at the root
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
           context: ./app/client
           file: ./app/client/Dockerfile
           push: true
+          # FRONTEND_ECR_REPO_URL is already the full image path - no suffix needed
           tags: |
-            ${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/frontend:${{ steps.meta.outputs.tag }}
-            ${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/frontend:latest
-          cache-from: type=registry,ref=${{ env.ECR_REPO_URL }}/${{ env.ECR_REPOSITORY }}/frontend:latest
+            ${{ env.FRONTEND_ECR_REPO_URL }}:${{ steps.meta.outputs.tag }}
+            ${{ env.FRONTEND_ECR_REPO_URL }}:latest
+          cache-from: type=registry,ref=${{ env.FRONTEND_ECR_REPO_URL }}:latest
           cache-to: type=inline
 
   deploy:
@@ -104,14 +104,14 @@ jobs:
             # Write compose-specific vars to a separate file
             # Keeps deployment config out of the app's runtime environment
             cat <<'EOF' > .env.deploy
-            ECR_REPO_URL=${{ secrets.ECR_REPOSITORY_URL }}
-            ECR_REPOSITORY=${{ vars.ECR_REPOSITORY }}
+            BACKEND_ECR_REPO_URL=${{ secrets.BACKEND_ECR_REPOSITORY_URL }}
+            FRONTEND_ECR_REPO_URL=${{ secrets.FRONTEND_ECR_REPOSITORY_URL }}
             IMAGE_TAG=${{ needs.build.outputs.image_tag }}
             EOF
 
-            # Authenticate Docker daemon to ECR
+            # Authenticate to ECR - only one login needed, both repos are in the same registry
             aws ecr get-login-password --region ${{ vars.AWS_REGION }} \
-              | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_URL }}
+              | docker login --username AWS --password-stdin ${{ secrets.BACKEND_ECR_REPOSITORY_URL }}
 
             # Pull updated images and restart all services
             docker compose --env-file .env --env-file .env.deploy down || true

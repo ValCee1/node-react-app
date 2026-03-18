@@ -43,7 +43,8 @@ resource "aws_iam_policy" "ecr_pull_policy" {
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage"
         ]
-        Resource = aws_ecr_repository.app.arn
+        Resource = aws_ecr_repository.backend.arn
+        Resource = aws_ecr_repository.frontend.arn
       }
     ]
   })
