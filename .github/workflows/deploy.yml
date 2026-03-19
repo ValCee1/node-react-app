@@ -116,7 +116,7 @@ jobs:
                 newgrp docker
                 sudo systemctl start docker
               fi
-
+            sudo systemctl start docker
             cd ~/node-react-app
             # Navigate to app directory (repo must be pre-cloned on EC2)
             cd ~/node-react-app
