@@ -99,7 +99,25 @@ jobs:
           script: |
             # Exit immediately if any command fails - prevents silent failures
             set -e
+            # Install docker compose plugin if not present
+            if ! docker compose version &>/dev/null; then
+               sudo apt-get update -y
+                sudo apt-get install -y ca-certificates curl gnupg
+                sudo install -m 0755 -d /etc/apt/keyrings
+                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+                sudo chmod a+r /etc/apt/keyrings/docker.gpg
+                echo \
+                  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+                  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+                  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+                sudo apt-get update -y
+                sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                sudo usermod -aG docker ubuntu
+                newgrp docker
+                sudo systemctl start docker
+              fi
 
+            cd ~/node-react-app
             # Navigate to app directory (repo must be pre-cloned on EC2)
             cd ~/node-react-app
 
