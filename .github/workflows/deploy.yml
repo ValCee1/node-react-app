@@ -90,6 +90,11 @@ jobs:
           source: "docker-compose.yml"
           target: "~/node-react-app"
 
+      - name: Scan Docker image
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: ${{ env.BACKEND_ECR_REPO_URL }}:${{ github.sha }}
+
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -125,7 +130,7 @@ jobs:
             cat <<'EOF' > .env
             MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_USERNAME }}
             MONGO_INITDB_ROOT_PASSWORD=${{ secrets.MONGO_PASSWORD }}
-            MONGODB_URI=mongodb://${{ secrets.MONGO_USERNAME }}:${{ secrets.MONGO_PASSWORD }}@mongodb:27017/react-node-app?authSource=admin
+            MONGODB_URI=mongodb://${{ secrets.MONGO_USERNAME }}:${{ secrets.MONGO_PASSWORD }}@mongodb:27017/node-react-starter?authSource=admin
             NODE_ENV=production
             PUBLIC_URL=${{ secrets.EC2_HOST }}
             EOF
